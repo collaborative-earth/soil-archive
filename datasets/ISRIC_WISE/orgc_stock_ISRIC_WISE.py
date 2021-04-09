@@ -67,8 +67,8 @@ def orgc_stock(profile):
     
     
 
-def depth_clip(profile, depth_min=0, depth_max=100):
-    #takes in a profile with N layers and returns a clipped profile, by default from 0 to 100cm
+def depth_clip(profile, depth_min=0, depth_max=30):
+    #takes in a profile with N layers and returns a clipped profile
     #the function assumes layers continuity
         
     top = profile.TOPDEP.values
@@ -204,7 +204,7 @@ del layers_keep
 del unique_profiles
 
 
-######### CLIPPING PROFILES AT DEPTH 1M #########
+######### CLIPPING PROFILES AT DEPTH 30 CM #########
 
 unique_profiles_cont = list(dict.fromkeys(df_hz_cont.WISE3_ID.values))
 df_hz_clip = pd.DataFrame(columns=list(df_hz_cont.columns))
@@ -244,7 +244,7 @@ df_site_orig = pd.read_csv("WISE3_SITE.csv", sep=';', decimal=',')
 df_site = df_site_orig.loc[:,['WISE3_id','DATEYR','LATDD','LONDD']]
 
 #drop layers (rows) for which we can't have missing values
-df_site.dropna(subset=['LATDD', 'LONDD'], inplace=True)
+df_site.dropna(subset=['LATDD', 'LONDD', 'DATEYR'], inplace=True)
         
 df_site.rename(columns={'WISE3_id':'profile_id'}, inplace=True)
         
@@ -268,6 +268,6 @@ del fractions_list
 
 ######### FINAL MERGE AND CSV EXPORT #########
 
-df_export = df_orgc_stock_clip.merge(df_fractions_clip, on='profile_id').merge(df_site, on='profile_id')
+df_export = df_orgc_stock_clip.merge(df_fractions_clip, on='profile_id', how='inner').merge(df_site, on='profile_id', how='inner')
 
 df_export.to_csv('orgc_stock_ISRIC_WISE_clip.csv')
