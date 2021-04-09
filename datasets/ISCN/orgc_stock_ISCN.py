@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import pandas as pd
+import numpy as np
 import copy
 
 
@@ -77,8 +78,8 @@ def orgc_stock(profile):
     
     
 
-def depth_clip(profile, depth_min=0, depth_max=100):
-    #takes in a profile with N layers and returns a clipped profile, by default from 0 to 100cm
+def depth_clip(profile, depth_min=0, depth_max=30):
+    #takes in a profile with N layers and returns a clipped profile
     #the function assumes layers continuity
         
     top = profile.layer_top.values
@@ -191,7 +192,7 @@ df_all.rename(columns={'layer_top (cm)':'layer_top'}, inplace=True)
 df_all.rename(columns={'lat (dec. deg)':'lat_dd'}, inplace=True)
 df_all.rename(columns={'long (dec. deg)':'long_dd'}, inplace=True)
 df_all.rename(columns={'oc (percent)':'oc_percent'}, inplace=True)
-df_all.rename(columns={'observation_date (YYYY-MM-DD)':'obs_date_yyyy_mm_dd'}, inplace=True)
+df_all.rename(columns={'observation_date (YYYY-MM-DD)':'obs_date_yyyy'}, inplace=True)
 
 
 #drop layers (rows) for which we can't have missing values
@@ -208,6 +209,14 @@ df_all = df_all.query('layer_bot > layer_top')
 
 #keeping only non-negative ORGC
 df_all = df_all.query('oc_percent >= 0')
+
+
+#dropping layers without date information
+df_all['obs_date_yyyy'].replace('', np.nan, inplace=True)
+df_all.dropna(subset=['obs_date_yyyy'], inplace=True)
+
+#uniforming date information to year-only
+df_all['obs_date_yyyy'] = df_all.apply(lambda x: x['obs_date_yyyy'][-4:], axis=1)
 
 #keep only unique rows
 df_all.drop_duplicates(inplace=True)
@@ -230,7 +239,7 @@ del layers_keep
 del unique_profiles
 
 
-######### CLIPPING PROFILES AT DEPTH 1M #########
+######### CLIPPING PROFILES AT DEPTH 30 CM #########
 
 unique_profiles_cont = list(dict.fromkeys(df_all_cont.sp_name.values))
 df_all_clip = pd.DataFrame(columns=list(df_all_cont.columns))
@@ -271,7 +280,7 @@ df_bd.drop_duplicates(inplace=True)
 
 ######### MERGING LAYERS' DATA WITH BULK_DENSITY ESTIMATIONS #########
 
-df_merged = df_all_clip.merge(df_bd, on=['sp_name','layer_name'])
+df_merged = df_all_clip.merge(df_bd, on=['sp_name','layer_name'], how='inner')
 
 #fixing null values in layer designation columns
 df_merged.loc[df_merged.hzn=='?'] = df_merged.replace(to_replace={ 'hzn' : { '?' : '' }})
@@ -326,14 +335,15 @@ del fractions_list
 ######### PROFILE DATA EXTRACTION #########
 
 #pick relevant columns
-df_profile_info = df_merged.loc[:,['sp_name','obs_date_yyyy_mm_dd','lat_dd','long_dd']]
+df_profile_info = df_merged.loc[:,['sp_name','obs_date_yyyy','lat_dd','long_dd']]
         
 df_profile_info.rename(columns={'sp_name':'profile_id'}, inplace=True)
         
-
+#keep only unique rows
+df_profile_info.drop_duplicates(subset='profile_id', inplace=True)
 
 ######### FINAL MERGE AND CSV EXPORT #########
 
-df_export = df_orgc_stock_clip.merge(df_fractions_clip, on='profile_id').merge(df_profile_info, on='profile_id')
+df_export = df_orgc_stock_clip.merge(df_fractions_clip, on='profile_id', how='inner').merge(df_profile_info, on='profile_id', how='left')
 
 df_export.to_csv('orgc_stock_ISCN_clip.csv')
